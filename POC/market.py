@@ -32,7 +32,9 @@ class Market:
         raise NotImplementedError("nir is gay")
 
     def pit(self):
-        self.pits.append(MarketPIT(self.market_id, self.median_highest_buy(), self.median_lowest_sell()))
+        high_buy, low_sell = self.median_highest_buy(), self.median_lowest_sell()
+        if high_buy != -1 and low_sell != -1:
+            self.pits.append(MarketPIT(self.market_id, high_buy, low_sell))
 
 
 class MockupMarket(Market):
@@ -74,9 +76,16 @@ class BittrexAPI(Market):
 
     def median_lowest(self, quantity, op, market):
         ts = time.time()
-        order_book = self.my_bittrex.get_orderbook(market=market)
+        #order_book = self.my_bittrex.get_orderbook(market=market)
+        try:
+            order_book = requests.get("https://bittrex.com/api/v1.1/public/getorderbook?market={0}&type=both".format(market), timeout=REQUEST_TIMEOUT)
+        except requests.ReadTimeout:
+            return -1
 
-        assert order_book['success'], "Failed retrieving order book"
+        assert order_book.status_code == 200, "Failed retrieving order book. status code {0}".\
+            format(order_book.status_code)
+
+        order_book = order_book.json()
 
         to_med = []
         total = 0
@@ -117,9 +126,13 @@ class BitfinexAPI(Market):
 
     def median_lowest(self, op, quantity, market):
         ts = time.time()
-        order_book = requests.get("https://api.bitfinex.com/v1/book/{0}".format(market))
+        try:
+            order_book = requests.get("https://api.bitfinex.com/v1/book/{0}".format(market), timeout=REQUEST_TIMEOUT)
+        except requests.ReadTimeout:
+            return -1
 
-        assert order_book.status_code == 200, "Failed retrieving order book"
+        assert order_book.status_code == 200, "Failed retrieving order book. status code {0}".\
+            format(order_book.status_code)
 
         order_book = order_book.json()
 

@@ -1,6 +1,6 @@
 from plotter import *
 from threading import Thread
-from argparse import ArgumentParser, ArgumentError
+from argparse import ArgumentParser, RawTextHelpFormatter, ArgumentError
 
 
 def do_work(symbol1, symbol2):
@@ -19,7 +19,7 @@ def do_work(symbol1, symbol2):
         t2.start()
         t1.join()
         t2.join()
-        time.sleep(0.3)
+        time.sleep(1.5)
 
     # Plotting the data
     plotter = Plotter(market1, market2, begin_time)
@@ -28,7 +28,8 @@ def do_work(symbol1, symbol2):
 
 
 def main():
-    arg_parser = ArgumentParser(usage="%(prog)s symbol1 symbol2", description="""
+    arg_parser = ArgumentParser(usage="%(prog)s symbol1 symbol2", formatter_class=RawTextHelpFormatter,
+                                description="""
 Presets: \n\tUSDT-BTC btcusd\n\tUSDT-LTC ltcusd\n\tUSDT-XRP xrpusd""")
 
     arg_parser.add_argument('symbols', type=str, nargs=2, help='symbol1 symbol2')
