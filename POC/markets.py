@@ -1,6 +1,8 @@
 import statistics
 import time
 from bittrex.bittrex import Bittrex, API_V2_0
+from collections import namedtuple
+MMTuple = namedtuple("MMTuple", "value timestamp")
 
 
 BUY = 'buy'
