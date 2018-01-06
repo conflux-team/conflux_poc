@@ -4,10 +4,8 @@ from plotter import *
 # market1 = MockupMarket("Market1", VOLUME)
 # market2 = MockupMarket("Market2", VOLUME)
 
-market1 = Market1(VOLUME)
+market1 = BittrexAPI(VOLUME)
 market2 = Market2(VOLUME)
-print(get_markets()[2])
-print([coin for coin in get_markets() if "USD" in coin])
 
 
 
