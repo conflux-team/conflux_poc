@@ -56,10 +56,9 @@ class BittrexAPI(Market):
     BUY = 'buy'
     SELL = 'sell'
 
-    def __init__(self, volume):
-        Market.__init__(self, "USDT-BTC", volume)
+    def __init__(self, market_id, volume):
+        Market.__init__(self, market_id, volume)
         self.my_bittrex = Bittrex(None, None)  # or defaulting to v1.1 as Bittrex(None, None)
-
 
     def median_highest_buy(self):
         return self.median_lowest(quantity=self.volume, op=self.SELL, market=self.market_id)
@@ -78,8 +77,6 @@ class BittrexAPI(Market):
         order_book = self.my_bittrex.get_orderbook(market=market)
 
         assert order_book['success'], "Failed retrieving order book"
-
-        order_book['result'][op].sort(key=lambda x: x['Rate'], reverse=(op == 'buy'))
 
         to_med = []
         total = 0
@@ -103,17 +100,14 @@ class BitfinexAPI(Market):
     BUY = "asks"
     SELL = "bids"
 
-    def __init__(self, volume):
-        Market.__init__(self, "btcusd", volume)
+    def __init__(self, market_id, volume):
+        Market.__init__(self, market_id, volume)
 
     def median_highest_buy(self):
-
-        _median_highest_buy = self.median_highest(op=self.SELL, volume=self.volume, market_id=self.market_id)
-        return MMTuple(1.0025 * _median_highest_buy[0], _median_highest_buy[1])
+        return self.median_lowest(quantity=self.volume, op=self.SELL, market=self.market_id)
 
     def median_lowest_sell(self):
-        _median_lowest_sell = median_highest(op=self.BUY, quantity=self.volume, market=self.market_id)
-        return MMTuple(0.9975 * _median_lowest_sell[0], _median_lowest_sell[1])
+        return self.median_lowest(quantity=self.volume, op=self.BUY, market=self.market_id)
 
     def median_highest_buy_commision(self, mula):
         return 1.002 * mula
@@ -121,21 +115,21 @@ class BitfinexAPI(Market):
     def median_lowest_sell_commision(self, mula):
         return 0.99 * mula
 
-    def median_lowest(self, op, volume, market_id):
+    def median_lowest(self, op, quantity, market):
         ts = time.time()
-        order_book = requests.get("https://api.bitfinex.com/v1/book/{0}".format(market_id))
+        order_book = requests.get("https://api.bitfinex.com/v1/book/{0}".format(market))
 
         assert order_book.status_code == 200, "Failed retrieving order book"
 
-        order_book[op].sort(key=lambda x: x['price'], reverse=(op == 'bids'))
+        order_book = order_book.json()
 
         to_med = []
         total = 0
 
         for order in order_book[op]:
-            to_med.append(order['price'])
-            total += order['amount']
-            if total >= volume:
+            to_med.append(float(order['price']))
+            total += float(order['amount'])
+            if total >= quantity:
                 break
 
         median = statistics.median(to_med)

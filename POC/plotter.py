@@ -14,30 +14,43 @@ class Plotter:
 
     def plot_arbitrage_on_both_markets(self):
         timestamps = []
-        arbitrage = []
+        arbitrages = []
         for pit_of_market1 in self.market1.pits:
-            for pit_of_market2 in self.market2.pits:
-                if pit_of_market2.median_lowest_sell.timestamp - pit_of_market1.median_highest_buy.timestamp > ARBITRAGE_DELTA_TIME_IN_SECONDS:
-                    break
-                if pit_of_market2.median_highest_buy.timestamp - pit_of_market1.median_lowest_sell.timestamp > ARBITRAGE_DELTA_TIME_IN_SECONDS:
-                    break
-                if pit_of_market1.median_highest_buy.timestamp - pit_of_market2.median_lowest_sell.timestamp > ARBITRAGE_DELTA_TIME_IN_SECONDS:
-                    continue
-                if pit_of_market1.median_lowest_sell.timestamp - pit_of_market2.median_highest_buy.timestamp > ARBITRAGE_DELTA_TIME_IN_SECONDS:
-                    continue
+            filt1 = list(filter(lambda x: abs(pit_of_market1.median_highest_buy.timestamp - x.median_lowest_sell.timestamp) < ARBITRAGE_DELTA_TIME_IN_SECONDS, self.market2.pits))
+            filt2 = list(filter(lambda x: abs(pit_of_market1.median_lowest_sell.timestamp - x.median_highest_buy.timestamp) < ARBITRAGE_DELTA_TIME_IN_SECONDS, self.market2.pits))
 
-                selected_median_highest_buy = pit_of_market1.median_highest_buy if pit_of_market1.median_highest_buy.value > pit_of_market2.median_highest_buy.value \
-                    else pit_of_market2.median_highest_buy
-                selected_median_lowest_sell = pit_of_market1.median_lowest_sell if pit_of_market1.median_lowest_sell.value < pit_of_market2.median_lowest_sell.value \
-                    else pit_of_market2.median_lowest_sell
-                timestamps.append(mean([selected_median_highest_buy.timestamp, selected_median_lowest_sell.timestamp]))
-                arbitrage.append(selected_median_highest_buy.value - selected_median_lowest_sell.value)
+            if not filt1 and not filt2:
+                continue
+            if not filt1:
+                filt1 = [MarketPIT(-1, 0, MMTuple(MAX_PRICE_IN_SHMEKELS, -1))]
+            if not filt2:
+                filt2 = [MarketPIT(-1, MMTuple(MIN_PRICE_IN_SHMEKELS, -1), -1)]
 
-        pretty_timestamps = timestamps
-        plt.plot(pretty_timestamps, arbitrage)
-        print("timestamps[{0}] = {1}\narbi[{2}] = {3}".
-              format(len(pretty_timestamps), pretty_timestamps, len(arbitrage), arbitrage))
+            min_of_sellers = list(sorted(filt1, key=lambda x: x.median_lowest_sell.value))[0]
+            max_of_buyers = list(sorted(filt2, key=lambda x: x.median_highest_buy.value, reverse=True))[0]
 
-        plt.axis([min(pretty_timestamps), max(pretty_timestamps), min(arbitrage), max(arbitrage)])
+            if pit_of_market1.median_highest_buy.value - min_of_sellers.median_lowest_sell.value > \
+                max_of_buyers.median_highest_buy.value - pit_of_market1.median_lowest_sell.value:
+                timestamp = mean([pit_of_market1.median_highest_buy.timestamp, min_of_sellers.median_lowest_sell.timestamp])
+                arbitrage = pit_of_market1.median_highest_buy.value - min_of_sellers.median_lowest_sell.value
+                self.market2.pits.remove(min_of_sellers)
+
+            else:
+                timestamp = mean([pit_of_market1.median_lowest_sell.timestamp, max_of_buyers.median_highest_buy.timestamp])
+                arbitrage = max_of_buyers.median_highest_buy.value - pit_of_market1.median_lowest_sell.value
+                self.market2.pits.remove(max_of_buyers)
+
+            timestamps.append(timestamp)
+            arbitrages.append(arbitrage)
+
+        pretty_timestamps = [timestamp - self.begin_time for timestamp in timestamps]
+
+        print(pretty_timestamps)
+        print()
+        print(arbitrages)
+
+        plt.plot(pretty_timestamps, arbitrages)
+
+        plt.axis([min(pretty_timestamps) - 5, max(pretty_timestamps) + 5, min(arbitrages), max(arbitrages)])
         plt.show()
 
