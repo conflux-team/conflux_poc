@@ -1,9 +1,10 @@
 import random
 from utils import *
 from bittrex.bittrex import Bittrex, API_V2_0
-from collections import namedtuple
-import statistics
+import requests
 import time
+import statistics
+from collections import namedtuple
 
 MarketPIT = namedtuple("MarketPIT", "id median_highest_buy median_lowest_sell")
 MMTuple = namedtuple("MMTuple", "value timestamp")
@@ -97,12 +98,51 @@ class BittrexAPI(Market):
             self.median_lowest_sell_commision(median)
         return MMTuple(median_after_commision, (ts + ts2) / 2)
 
-class Market2(Market):
+
+class BitfinexAPI(Market):
+    BUY = "asks"
+    SELL = "bids"
+
     def __init__(self, volume):
-        Market.__init__(self, "USDT-LTC", volume)
+        Market.__init__(self, "btcusd", volume)
 
     def median_highest_buy(self):
-        pass
+
+        _median_highest_buy = self.median_highest(op=self.SELL, volume=self.volume, market_id=self.market_id)
+        return MMTuple(1.0025 * _median_highest_buy[0], _median_highest_buy[1])
 
     def median_lowest_sell(self):
-        pass
+        _median_lowest_sell = median_highest(op=self.BUY, quantity=self.volume, market=self.market_id)
+        return MMTuple(0.9975 * _median_lowest_sell[0], _median_lowest_sell[1])
+
+    def median_highest_buy_commision(self, mula):
+        return 1.002 * mula
+
+    def median_lowest_sell_commision(self, mula):
+        return 0.99 * mula
+
+    def median_lowest(self, op, volume, market_id):
+        ts = time.time()
+        order_book = requests.get("https://api.bitfinex.com/v1/book/{0}".format(market_id))
+
+        assert order_book.status_code == 200, "Failed retrieving order book"
+
+        order_book[op].sort(key=lambda x: x['price'], reverse=(op == 'bids'))
+
+        to_med = []
+        total = 0
+
+        for order in order_book[op]:
+            to_med.append(order['price'])
+            total += order['amount']
+            if total >= volume:
+                break
+
+        median = statistics.median(to_med)
+        print("Median Rate: {}, Total Quantity: {}".format(median, total))
+        ts2 = time.time()
+        print("Time Took: {}".format(ts2 - ts))
+
+        median_after_commision = self.median_highest_buy_commision(median) if op == self.SELL else \
+            self.median_lowest_sell_commision(median)
+        return MMTuple(median_after_commision, (ts + ts2) / 2)
